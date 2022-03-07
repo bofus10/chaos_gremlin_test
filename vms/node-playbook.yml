@@ -1,0 +1,54 @@
+---
+- hosts: all
+  vars:
+    gremlin_config:
+      gremlin_team_id: "{{ gremlin_team_id }}"
+      gremlin_team_secret: "{{ gremlin_team_secret }}"
+      gremlin_identifier: "{{ gremlin_identifier }}"
+    gremlin_user: gremlin
+    gremlin_group: gremlin
+    gremlin_yum_repo: "https://rpm.gremlin.com/noarch/"
+    gremlin_yum_gpgkey: "https://rpm.gremlin.com/gremlin-pgp-public.key"
+  become: yes
+
+  tasks:
+    - name: disable SELinux
+      command: setenforce 0
+
+    - name: Stop and Disable Firewalld
+      service:
+       name: firewalld
+       state: stopped
+       enabled: no
+
+    - name: Add Gremlin Repo
+      yum_repository:
+       name: gremlin
+       description: gremlin YUM repo
+       baseurl: "{{ gremlin_yum_repo }}"
+       enabled: yes
+       gpgcheck: yes
+       gpgkey: "{{ gremlin_yum_gpgkey }}"
+       state: present
+
+    - name: install Gremlin
+      yum:
+       state: present
+       update_cache: true
+       name:
+       - gremlin
+       - gremlind
+
+    - name: Create Gremlin configuration file
+      template:
+        src: gremlind.j2
+        dest: /etc/default/gremlind
+        owner: "{{ gremlin_user }}"
+        group: "{{ gremlin_group }}"
+      notify: restart gremlind
+
+  handlers:
+    - name: restart gremlind
+      service:
+        name: gremlind
+        state: restarted
